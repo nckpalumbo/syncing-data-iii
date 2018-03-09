@@ -111,6 +111,7 @@
                 square.y = lerpMovement(square.prevY, square.destY, square.alpha);
                 ctx.fillRect(square.x, square.y, square.width, square.height);
             }
+            getGravity();
           requestAnimationFrame(draw);
         };
         
@@ -159,9 +160,6 @@
             ctx = canvas.getContext("2d");
 
             socket = io.connect();
-            socket.on('connect', function () {
-                setInterval(getGravity, 20);
-            });  
 
             socket.on('joined', setUser);
             socket.on('updateMovement', update);
