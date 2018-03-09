@@ -20,12 +20,11 @@ const io = socketio(app);
 
 app.listen(PORT);
 
-io.on('connection', (sock) => {
-  const socket = sock;
+io.on('connection', (socket) => {
   socket.join('room1');
   const randX = Math.floor((Math.random() * 525)) + 1;
 
-  socket.square = {
+  socket.square = { // eslint-disable-line no-param-reassign
     hash: xxh.h32(`${socket.id}${new Date().getTime()}`, 0xABCDDCBA).toString(16),
     lastUpdate: new Date().getTime(),
     x: randX,
@@ -43,18 +42,18 @@ io.on('connection', (sock) => {
   socket.emit('joined', socket.square);
 
   socket.on('updateGrav', (data) => {
-    socket.square = data;
+    socket.square = data; // eslint-disable-line no-param-reassign
     if (data.destY <= 675) {
       const gravity = data.destY + 5;
-      socket.square.destY = gravity;
+      socket.square.destY = gravity; // eslint-disable-line no-param-reassign
 
       io.to(socket.id).emit('getGrav', socket.square);
     }
   });
 
   socket.on('movementUpdate', (data) => {
-    socket.square = data;
-    socket.square.lastUpdate = new Date().getTime();
+    socket.square = data; // eslint-disable-line no-param-reassign
+    socket.square.lastUpdate = new Date().getTime();// eslint-disable-line no-param-reassign
 
     socket.broadcast.to('room1').emit('updateMovement', socket.square);
   });
