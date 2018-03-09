@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Syncing Data III</title>
+    <meta charset="utf-8"/>
+    <style>
+      canvas {
+        margin: 10px;
+        border: 5px solid black;
+      }
+    </style>
+    <script src="/socket.io/socket.io.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-core/5.8.34/browser.min.js"></script>
+	<script type="text/babel">  
+        "use strict";
+    
+        let canvas;
+        let ctx;
+        let socket; 
+        let hash;  
+        let moveLeft = false; 
+        let moveRight = false;  
+        let jump = false;
+        let squares = {};
+        let randColor = "#"+((1<<24)*Math.random()|0).toString(16); //SO Solution that was interesting https://stackoverflow.com/questions/1484506/random-color-generator
+        
+        const update = (data) => {
+            if(!squares[data.hash]) {
+                squares[data.hash] = data;
+                return;
+            }
+            const square = squares[data.hash];
+          
+            if(square.lastUpdate >= data.lastUpdate) {
+                return;
+            }
+              
+            square.lastUpdate = data.lastUpdate;
+            square.prevX = data.prevX;
+            square.prevY = data.prevY;
+            square.destX = data.destX;
+            square.destY = data.destY;
+            square.alpha = 0.05;
+            square.jump = data.jump;
+        };
+        
+        const setUser = (data) => {
+            hash = data.hash;
+            squares[hash] = data;
+          
+            requestAnimationFrame(draw);
+        };
+        const removeUser = (hash) => {
+            if(squares[hash]) {
+                delete squares[hash];
+            }
+        };
+                
+        const lerpMovement = (v0, v1, alpha) => {
+            return (1 - alpha) * v0 + alpha * v1;
+        };
+        
+        const updatePosition = (data) => {
+            const square = squares[hash];
+            square.prevX = square.x;
+            square.prevY = square.y;
+
+            if(moveLeft && square.destX > 0) {
+              square.destX -= 2;
+            }
+            if(moveRight && square.destX < 525) {
+                square.destX += 2;
+            }
+            if(jump && square.y > 625){
+                square.destY -= 10;
+            }
+    
+            square.alpha = 0.05;
+            
+            socket.emit('movementUpdate', square);
+        };
+
+        const updateGravity = (data) => {
+            const square = squares[hash];      
+            square.prevY = square.y;
+            square.destY = data.destY;
+            square.alpha = 0.05;
+        };
+        
+        const draw = (time) => {
+            updatePosition();
+            ctx.clearRect(0, 0, 600, 750);
+
+            const keys = Object.keys(squares);
+
+            for(let i = 0; i < keys.length; i++) {
+                const square = squares[keys[i]];
+
+                if(square.alpha < 1){
+                    square.alpha += 0.05;
+                }
+
+                if(square.hash === hash) {
+                    ctx.fillStyle = randColor;
+                }
+                else {
+                    ctx.fillStyle = "#000000";
+                }
+
+                square.x = lerpMovement(square.prevX, square.destX, square.alpha);
+                square.y = lerpMovement(square.prevY, square.destY, square.alpha);
+                ctx.fillRect(square.x, square.y, square.width, square.height);
+            }
+          requestAnimationFrame(draw);
+        };
+        
+        let leftKey = 37;
+        let rightKey = 39;
+        let aKey = 65;
+        let dKey = 68;
+        let spacebar = 32;
+
+        const keyDownHandler = (e) => {  
+            var keyPressed = e.which;
+            if(keyPressed === aKey || keyPressed === leftKey) {
+                moveLeft = true;
+            }
+            else if(keyPressed === dKey || keyPressed === rightKey) {
+                moveRight = true;
+            }
+            else if(keyPressed === spacebar){
+                jump = true;
+            }
+
+            if(moveLeft || moveRight || jump) {
+                e.preventDefault();
+            }
+        };
+        
+        const keyUpHandler = (e) => {
+            var keyPressed = e.which;
+            if(keyPressed === aKey || keyPressed === leftKey) {
+                moveLeft = false;
+            }
+            else if(keyPressed === dKey || keyPressed === rightKey) {
+                moveRight = false;
+            }       
+            else if(keyPressed === spacebar){
+                jump = false;
+            }
+        };
+
+        const getGravity = () => {
+            socket.emit('updateGrav', squares[hash]);  
+        };
+
+        const init = () => {
+            canvas = document.querySelector("#canvas");
+            ctx = canvas.getContext("2d");
+
+            socket = io.connect();
+            socket.on('connect', function () {
+                setInterval(getGravity, 20);
+            });  
+
+            socket.on('joined', setUser);
+            socket.on('updateMovement', update);
+
+            socket.on('getGrav', updateGravity);
+            socket.on('disconnect', removeUser);
+
+            document.body.addEventListener('keyup', keyUpHandler);
+            document.body.addEventListener('keydown', keyDownHandler);
+        };
+
+        window.onload = init;
+    </script>
+</head>
+<body>
+    <canvas id="canvas" height="750" width="600">Please use an HTML 5 browser</canvas>
+</body>
+</html>
